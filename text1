@@ -1,0 +1,152 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def f(x):
+    """目标函数 f(x,y)=(x-2)^2+(y-4)^2"""
+    return (x[0] - 2) ** 2 + (x[1] - 4) ** 2
+
+
+def grad(x):
+    """梯度"""
+    return np.array([2 * (x[0] - 2), 2 * (x[1] - 4)], dtype=float)
+
+
+def hessian(x):
+    """Hessian 矩阵"""
+    return np.array([[2.0, 0.0], [0.0, 2.0]])
+
+
+def gradient_descent_fixed_step(x0, alpha=0.2, tol=1e-8, max_iter=50):
+    """固定步长梯度下降法。用于在图中更清楚地展示多步搜索过程。"""
+    x = x0.astype(float).copy()
+    path = [x.copy()]
+    for _ in range(max_iter):
+        g = grad(x)
+        if np.linalg.norm(g) < tol:
+            break
+        x = x - alpha * g
+        path.append(x.copy())
+    return np.array(path)
+
+
+def gradient_descent_exact_line(x0, tol=1e-8, max_iter=50):
+    """精确线搜索梯度下降法。本题中会一步到达最优点。"""
+    x = x0.astype(float).copy()
+    path = [x.copy()]
+    for _ in range(max_iter):
+        g = grad(x)
+        if np.linalg.norm(g) < tol:
+            break
+        d = -g
+        H = hessian(x)
+        alpha = -np.dot(g, d) / np.dot(d, H.dot(d))
+        x = x + alpha * d
+        path.append(x.copy())
+    return np.array(path)
+
+
+def newton_method(x0, tol=1e-8, max_iter=50):
+    """牛顿法。本题为严格凸二次函数，会一步到达最优点。"""
+    x = x0.astype(float).copy()
+    path = [x.copy()]
+    for _ in range(max_iter):
+        g = grad(x)
+        if np.linalg.norm(g) < tol:
+            break
+        d = np.linalg.solve(hessian(x), -g)
+        x = x + d
+        path.append(x.copy())
+    return np.array(path)
+
+
+def conjugate_gradient(x0, tol=1e-8, max_iter=50):
+    """共轭梯度法。适用于对称正定二次函数。"""
+    x = x0.astype(float).copy()
+    A = hessian(x)
+    g = grad(x)
+    d = -g
+    path = [x.copy()]
+    for _ in range(max_iter):
+        if np.linalg.norm(g) < tol:
+            break
+        alpha = -np.dot(g, d) / np.dot(d, A.dot(d))
+        x_new = x + alpha * d
+        g_new = grad(x_new)
+        path.append(x_new.copy())
+        if np.linalg.norm(g_new) < tol:
+            break
+        beta = np.dot(g_new, g_new) / np.dot(g, g)
+        d = -g_new + beta * d
+        x, g = x_new, g_new
+    return np.array(path)
+
+
+def draw_path(path, label, color, marker):
+    """画路径点和相邻点之间的箭头。"""
+    plt.plot(path[:, 0], path[:, 1], marker=marker, color=color, label=label)
+    for i in range(len(path) - 1):
+        dx = path[i + 1, 0] - path[i, 0]
+        dy = path[i + 1, 1] - path[i, 1]
+        plt.arrow(
+            path[i, 0],
+            path[i, 1],
+            dx,
+            dy,
+            length_includes_head=True,
+            head_width=0.08,
+            head_length=0.12,
+            fc=color,
+            ec=color,
+            alpha=0.85,
+        )
+
+
+def main():
+    x0 = np.array([0.0, 0.0])
+    x_star = np.array([2.0, 4.0])
+
+    # 梯度下降固定步长更适合画“搜索过程”；精确线搜索会与牛顿法、共轭梯度法一样一步到达。
+    path_gd_show = gradient_descent_fixed_step(x0, alpha=0.2)
+    path_gd_exact = gradient_descent_exact_line(x0)
+    path_newton = newton_method(x0)
+    path_cg = conjugate_gradient(x0)
+
+    x = np.linspace(-1, 5, 300)
+    y = np.linspace(-1, 6, 300)
+    X, Y = np.meshgrid(x, y)
+    Z = (X - 2) ** 2 + (Y - 4) ** 2
+
+    plt.figure(figsize=(8, 7))
+    contour = plt.contour(X, Y, Z, levels=18, cmap="viridis", alpha=0.75)
+    plt.clabel(contour, inline=True, fontsize=8)
+
+    draw_path(path_gd_show, "Gradient descent, fixed step", "#d62728", "o")
+    draw_path(path_gd_exact, "Gradient descent, exact line", "#ff7f0e", "s")
+    draw_path(path_newton, "Newton method", "#1f77b4", "^")
+    draw_path(path_cg, "Conjugate gradient", "#2ca02c", "D")
+
+    plt.scatter(x0[0], x0[1], c="black", s=60, zorder=5)
+    plt.text(x0[0] - 0.35, x0[1] - 0.3, "start (0,0)", fontsize=10)
+
+    plt.scatter(x_star[0], x_star[1], c="purple", s=80, marker="*", zorder=6)
+    plt.text(x_star[0] + 0.1, x_star[1] + 0.1, "minimum (2,4)", fontsize=10)
+
+    plt.title("The search paths for f(x,y)=(x-2)^2+(y-4)^2")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.axis("equal")
+    plt.grid(True, linestyle="--", alpha=0.35)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    print("固定步长梯度下降路径：")
+    print(path_gd_show)
+    print("精确线搜索梯度下降路径：", path_gd_exact)
+    print("牛顿法路径：", path_newton)
+    print("共轭梯度法路径：", path_cg)
+
+
+if __name__ == "__main__":
+    main()
