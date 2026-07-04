@@ -1,0 +1,160 @@
+import numpy as np
+
+# =========================
+# 目标函数及其导数信息
+# =========================
+
+def f(x):
+    """
+    目标函数（二次函数，严格凸）
+    f(x) = (x0 - 2)^2 + (x1 - 4)^2
+    最小值点在 x* = [2, 4]
+    """
+    return (x[0] - 2) ** 2 + (x[1] - 4) ** 2
+
+
+def grad(x):
+    """
+    梯度（一阶导数）
+    ∇f(x) = [2(x0 - 2), 2(x1 - 4)]
+    """
+    return np.array([2 * (x[0] - 2), 2 * (x[1] - 4)], dtype=float)
+
+
+def hessian(x):
+    """
+    Hessian 矩阵（二阶导数）
+    对于该二次函数，Hessian 是常数矩阵
+    H = [[2, 0],
+         [0, 2]]
+    """
+    return np.array([[2.0, 0.0], [0.0, 2.0]])
+
+
+# =========================
+# 梯度下降法（Gradient Descent）
+# 搜索方向：负梯度方向
+# 步长策略：精确线搜索
+# =========================
+def gradient_descent(x0, tol=1e-8, max_iter=1000):
+    """
+    梯度下降法求解无约束优化问题
+    """
+    x = x0.astype(float).copy()
+    history = []  # 记录迭代历史：(k, x, f(x), ||∇f||)
+
+    for k in range(max_iter):
+        g = grad(x)
+        history.append((k, x.copy(), f(x), np.linalg.norm(g)))
+
+        # 收敛判据：梯度范数小于阈值
+        if np.linalg.norm(g) < tol:
+            break
+
+        # 搜索方向：负梯度方向
+        d = -g
+
+        # 精确线搜索步长（适用于二次函数）
+        # α = -(∇f^T d) / (d^T H d)
+        H = hessian(x)
+        alpha = -np.dot(g, d) / np.dot(d, H.dot(d))
+
+        # 更新迭代点
+        x = x + alpha * d
+
+    return x, f(x), len(history), history
+
+
+# =========================
+# 牛顿法（Newton Method）
+# 搜索方向：-H^{-1} ∇f
+# 步长：固定为 1（二次函数一次收敛）
+# =========================
+def newton_method(x0, tol=1e-8, max_iter=1000):
+    """
+    牛顿法求解无约束优化问题
+    对严格凸二次函数，理论上一次迭代即可收敛
+    """
+    x = x0.astype(float).copy()
+    history = []
+
+    for k in range(max_iter):
+        g = grad(x)
+        history.append((k, x.copy(), f(x), np.linalg.norm(g)))
+
+        if np.linalg.norm(g) < tol:
+            break
+
+        # 牛顿方向：d = -H^{-1} g
+        d = np.linalg.solve(hessian(x), -g)
+
+        # 更新（精确步长 α = 1）
+        x = x + d
+
+    return x, f(x), len(history), history
+
+
+# =========================
+# 共轭梯度法（Conjugate Gradient）
+# 适用于对称正定二次函数的无约束优化
+# =========================
+def conjugate_gradient(x0, tol=1e-8, max_iter=1000):
+    """
+    非线性共轭梯度法（Fletcher–Reeves 形式）
+    对二次函数 n 维问题最多 n 步收敛
+    """
+    x = x0.astype(float).copy()
+    A = hessian(x)          # 对应二次函数的 Hessian
+    g = grad(x)             # 初始梯度
+    d = -g                  # 初始搜索方向
+    history = []
+
+    for k in range(max_iter):
+        history.append((k, x.copy(), f(x), np.linalg.norm(g)))
+
+        if np.linalg.norm(g) < tol:
+            break
+
+        # 精确线搜索步长
+        alpha = -np.dot(g, d) / np.dot(d, A.dot(d))
+
+        # 更新变量
+        x_new = x + alpha * d
+        g_new = grad(x_new)
+
+        # Fletcher–Reeves 系数
+        beta = np.dot(g_new, g_new) / np.dot(g, g)
+
+        # 更新搜索方向
+        d = -g_new + beta * d
+
+        # 准备下一次迭代
+        x, g = x_new, g_new
+
+    return x, f(x), len(history), history
+
+
+# =========================
+# 主程序：对比三种优化方法
+# =========================
+if __name__ == "__main__":
+    # 初始点
+    x0 = np.array([0.0, 0.0])
+    '''
+    methods = [
+        ("梯度下降法", gradient_descent),
+        ("牛顿法", newton_method),
+        ("共轭梯度法", conjugate_gradient),
+    ]
+     '''
+    methods = [
+    ("梯度下降法", lambda x: gradient_descent(x, tol=1e-1)),
+    ("牛顿法", lambda x: newton_method(x, tol=1e-1)),
+    ("共轭梯度法", lambda x: conjugate_gradient(x, tol=1e-1)),
+    ]
+    for name, method in methods:
+        x_opt, f_opt, iters, hist = method(x0)
+        print(f"{name}:")
+        print(f"  最优解 x = {x_opt}")
+        print(f"  最优值 f(x) = {f_opt:.10e}")
+        print(f"  迭代次数 = {iters}")
